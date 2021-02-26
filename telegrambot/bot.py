@@ -1,9 +1,9 @@
 import os
 import re
-
-from PIL import Image
 import requests
 import logging
+
+from PIL import Image
 import aiohttp
 import asyncio
 from aiogram import Bot, Dispatcher, executor, types
@@ -34,7 +34,9 @@ dp = Dispatcher(bot)
 @dp.message_handler(commands=['start'])
 async def send_welcome(message: types.Message):
     user_name = message.from_user.first_name
+    user_id = message.from_user.id
     text = HELLO_TEXT %user_name
+    logging.info(f'first start from user_name = {user_name}, user_id = {user_id}')
     await message.reply(text)
 
 @dp.message_handler(content_types=NOT_TARGET_CONTENT_TYPES)
@@ -49,7 +51,7 @@ async def handle_docs_photo(message):
 async def handle_photo_for_prediction(message):
     chat_id = message.chat.id
 
-    # check for 'single photo - single message'
+    # Check for 'single photo - single message'
     # None media_group_id - means single photo at message
     if message.media_group_id is None:
         ### Get user's variables
@@ -58,37 +60,40 @@ async def handle_photo_for_prediction(message):
         message_id = message.message_id
 
         text = WAITING_TEXT %user_name
+        logging.info(f'{user_name, user_id} is knocking to our bot')
         await bot.send_message(chat_id, text)
 
-        # define input photo local path
+        # Define input photo local path
         photo_name = './input/carphoto_%s_%s.jpg' %(user_id, message_id)
         await message.photo[-1].download(photo_name) # extract photo for further procceses
 
         ### Detection of car on photo with Detectron2
 
-        # output photo local path
+        # Output photo local path
         detection_photo_name = './output/detection/photo_%s_%s.jpg' %(user_id, message_id)
+        # Set output path for internal use
         cropped_photo_name = './output/detection/detected_car_photo_%s_%s.jpg' %(user_id, message_id)
-        # detector predictions
+        # Detector predictions
         num_cars, little_car = car_inspector(photo_name, detection_photo_name, cropped_photo_name)
 
         # Find proper car bounding box for futher manipulations
         if num_cars == 0:
-
+            # It means - no proper car on the photos
+            # Error message for notcar input photo
             logging.info(f'call "car_inspection_results" = {num_cars} - it means: no car here!')
-            #it means - no proper car on the photos
-            # error message for notcar input photo
             await message.reply(ERROR_NOT_CAR)
             await bot.send_photo(chat_id, photo=open(detection_photo_name, 'rb'))
 
-        # car inspector found the car!
         else:
-            # set output path for internal use
+            # Car inspector found the car!
 
+            # Check for proper size car on the photo
             if little_car == True:
                 await message.reply(ERROR_LITTLE_CAR)
                 await bot.send_photo(chat_id, photo=open(detection_photo_name, 'rb'))
+
             else:
+                # We found the for proper size car on the photo
                 await message.reply('Смотри-ка! Мы нашли её!')
                 await bot.send_photo(chat_id, photo=open(detection_photo_name, 'rb'))
                 await bot.send_photo(chat_id, photo=open(cropped_photo_name, 'rb'))
@@ -100,22 +105,22 @@ async def handle_photo_for_prediction(message):
                 # Massive prediction extraction
                 decoded_result, index_top_pred = prediction_decoder(preds) # and decode to text form
 
-                # inline keyboard compilation
+                # Inline keyboard compilation
                 keyboard = reply_markup_compiler(*decoded_result)
 
-                # output prediction collage parameters
+                # Output prediction collage parameters
                 car_classes_path = './output_car_classes'
                 height = 300
                 width = 400
                 frame_width = 10
 
-                # take preds index for top-4 for collage generation
+                # Take preds index for top-4 for collage generation
                 index1 = str(index_top_pred[3])+'.jpg'
                 index2 = str(index_top_pred[2])+'.jpg'
                 index3 = str(index_top_pred[1])+'.jpg'
                 index4 = str(index_top_pred[0])+'.jpg'
 
-                # make collage image
+                # Make collage image
                 pred_img = photos_in_frame(height, width, frame_width,
                                            car_classes_path,
                                            index1, index2, index3, index4)
@@ -123,10 +128,10 @@ async def handle_photo_for_prediction(message):
                 pred_collage_path = './output/output_%s_%s.jpg' %(user_id, message_id)
                 pred_img.save(pred_collage_path)
 
-                # little pause before send prediction message in seconds
+                # Little pause before send prediction message (in seconds)
                 await asyncio.sleep(3)
 
-                # resulting massage of prediction
+                # Resulting massage of prediction
                 await bot.send_photo(chat_id,
                                      photo=open(pred_collage_path, 'rb'),
                                      caption=HINT_TEXT,
@@ -135,19 +140,17 @@ async def handle_photo_for_prediction(message):
                 # Inline buttons callback query handlers
                 @dp.callback_query_handler(lambda callback_query: True)
                 async def callback_handler(call: types.CallbackQuery):
-                    # set time  in seconds that callback query results may be cached by client-side
+                    # Set time in seconds that callback query results may be cached by client-side
                     await call.answer(cache_time=60)
-
-                    # define callback data
                     callback_data = call.data
-                    logging.info(f'call = {callback_data}')
-                    # make car description for inline buttons response
+                    logging.info(f'call = {user_name, user_id, message_id, callback_data}')
+                    # Make car description for inline buttons response
                     # by car dictionary decoder and resulting text generator
                     description = car_description(callback_data)
                     await call.message.answer(description, disable_web_page_preview=True)
 
     else:
-        # if more than one photo in  message
+        # If more than one photo in  message
         await message.reply("Пожалуйста, пришли одну фотографию, а не вот столько!")
 
 

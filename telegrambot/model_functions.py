@@ -1,23 +1,41 @@
 import re
-import numpy as np
+import csv
+import logging
 
+import numpy as np
+import tensorflow as tf
 # set gpu memory using parameters on the private local server
 # cause keras/tf takes all avaiable gpu memory on default
-import tensorflow as tf
-gpus = tf.config.experimental.list_physical_devices('GPU')
-if gpus:
-  try:
-    tf.config.experimental.set_virtual_device_configuration(gpus[0],
-    [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1560)])
-  except RuntimeError as error:
-    print(error)
+
+# gpus = tf.config.experimental.list_physical_devices('GPU')
+# if gpus:
+#   try:
+#     tf.config.experimental.set_virtual_device_configuration(gpus[0],
+#     [tf.config.experimental.VirtualDeviceConfiguration(memory_limit=1560)])
+#   except RuntimeError as error:
+#       print(error)
+#       pass
+
+physical_devices = tf.config.list_physical_devices('GPU')
+if physical_devices:
+    try:
+        tf.config.experimental.set_memory_growth(physical_devices[0], True)
+    except:
+        pass # Invalid device or cannot modify virtual devices once initialized.
 
 from keras.models import load_model
-
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from callback_data import car_callback
 
-from car_dict import CAR_DICT
+# setup logging
+logging.basicConfig(level=logging.INFO)
+
+
+with open('car_models.csv', newline='') as f:
+    reader = csv.reader(f)
+    car_models = tuple(reader)
+
+decoder = dict(enumerate(car_models))
 
 
 # NASNetLarge model trained on our dataset for target car classification
@@ -30,24 +48,25 @@ def prediction_classifier(img_array):
 
 def prediction_decoder(preds):
     # define car names dictionary for decode prediction
-    decoder = CAR_DICT
 
     index_top_pred = np.argsort(preds[0])[-4:]
 
-    car1 = decoder.get(index_top_pred[3])
-    car2 = decoder.get(index_top_pred[2])
-    car3 = decoder.get(index_top_pred[1])
-    car4 = decoder.get(index_top_pred[0])
 
-    top1_percent = np.sort(preds[0])[-1]
-    top2_percent = np.sort(preds[0])[-2]
-    top3_percent = np.sort(preds[0])[-3]
-    top4_percent = np.sort(preds[0])[-4]
+    car1 = str(decoder.get(index_top_pred[3]))[2:-6]
+    car2 = str(decoder.get(index_top_pred[2]))[2:-6]
+    car3 = str(decoder.get(index_top_pred[1]))[2:-6]
+    car4 = str(decoder.get(index_top_pred[0]))[2:-6]
+
+
+
+    top4_percent, top3_percent, top2_percent, top1_percent = np.sort(preds[0])[-4:]
 
     pred_1 = car1[:-10]+', '+'{:.1%}'.format(float(top1_percent))
     pred_2 = car2[:-10]+', '+'{:.1%}'.format(float(top2_percent))
     pred_3 = car3[:-10]+', '+'{:.1%}'.format(float(top3_percent))
     pred_4 = car4[:-10]+', '+'{:.1%}'.format(float(top4_percent))
+
+    logging.info(f'callback_data = {pred_1, pred_2, pred_3, pred_4}')
 
     return (pred_1, pred_2, pred_3, pred_4, car1, car2, car3, car4), index_top_pred
 

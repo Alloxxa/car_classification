@@ -2,5 +2,14 @@ aiohttp
 uvloop
 ujson
 aiogram
-keras
+pillow
 numpy
+pandas
+tensorflow
+keras
+opencv-python
+torch
+torchvision
+
+!python -m pip install detectron2 -f \
+  https://dl.fbaipublicfiles.com/detectron2/wheels/cu110/torch1.7/index.html

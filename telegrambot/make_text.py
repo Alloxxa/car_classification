@@ -4,7 +4,7 @@ import os
 path = 'cars_info.xlsx'
 table = pd.read_excel(path).drop(columns=['Unnamed: 0'])
 
-rome_numbers = {'I' : '1',
+roman_numerals = {'I' : '1',
                 'II' : '2',
                 'III' : '3',
                 'IV' : '4',
@@ -38,7 +38,7 @@ def text_for_cars(name):
             space2 = ''
             max_price = str(max_price)[0] + ',' + str(max_price)[1:]
         words_list = output_upd.split('.')[0].split(' ')
-        words_list = [(word if word not in rome_numbers else rome_numbers[word]) for word in words_list]
+        words_list = [(word if word not in roman_numerals else roman_numerals[word]) for word in words_list]
         words_list[-1] = words_list[-1] + '.'
         words_list.append(final_age)
         google_ref = standard_URL + '+'.join(words_list)
